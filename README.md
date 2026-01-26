@@ -7,11 +7,12 @@ A minimalist, high-performance TUI browser for MPD using `fzf` and `ueberzugpp`.
 
 ## Features
 
-* 󰋩 **Cover Art**: Instant album art rendering via Ueberzug++.
-*  **Fuzzy Search**: Instant library filtering with `fzf`.
-* 󱗼 **Multi-Selection**: Queue multiple tracks or albums at once.
-* 󰲋 **Smart Sync**: Jump to the currently playing song on launch.
-* 󰏘 **ANSI Colors**: Clean magenta/white split for directories and files.
+* 󰋩 **Cover Art**: Renders album art using Ueberzug++.
+* 󰫙 **Layouts**: Supports "Right" or "Bottom" preview modes (centered).
+*  **Search**: Uses `fzf` for instant library filtering.
+* 󱗼 **Selection**: Select multiple tracks or albums with TAB to queue them.
+* 󰲋 **Sync**: Auto-selects the currently playing song on startup.
+* 󰏘 **UI**: Simple ANSI colors with grey dividers for a cleaner look.
 
 ## Dependencies
 
@@ -30,14 +31,19 @@ cp fmpc fmpc-play ~/.local/bin/
 
 ```
 
+2. Open `fmpc` and configure your music path:
 
-2. Configure your music path in the `fmpc` script:
 ```bash
 export MUSIC_DIR="/path/to/your/music"
 
 ```
 
+3. Choose your preferred layout at the top of the script:
 
+```bash
+export PREVIEW_POS="right" # Change to "bottom" for centered view
+
+```
 
 ## Usage
 
@@ -52,7 +58,7 @@ fmpc
 
 | Key | Action |
 | --- | --- |
-| 󰌑  **ENTER** | Play highlighted song |
+| 󰌑 **ENTER** | Play highlighted song |
 | 󰓗 **TAB** | Select/Deselect multiple songs |
 | 󱊖 **Ctrl-x** | Play all selected songs |
 | 󰍉 **Ctrl-f** | Search for current playing song |
