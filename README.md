@@ -5,7 +5,7 @@
 
 A minimalist, high-performance TUI browser for MPD using `fzf` and `ueberzugpp`.
 
-## 󱓞 Features
+## Features
 
 * 󰋩 **Cover Art**: Instant album art rendering via Ueberzug++.
 *  **Fuzzy Search**: Instant library filtering with `fzf`.
@@ -13,7 +13,7 @@ A minimalist, high-performance TUI browser for MPD using `fzf` and `ueberzugpp`.
 * 󰲋 **Smart Sync**: Jump to the currently playing song on launch.
 * 󰏘 **ANSI Colors**: Clean magenta/white split for directories and files.
 
-## 󰚦 Dependencies
+## Dependencies
 
 * `mpd` / `mpc`
 * `fzf`
@@ -21,7 +21,7 @@ A minimalist, high-performance TUI browser for MPD using `fzf` and `ueberzugpp`.
 * `ffmpeg` (for cover extraction)
 * `Nerd Fonts`
 
-## 󰄜 Installation
+## Installation
 
 1. Clone the repository and move both scripts to your bin directory:
 ```bash
@@ -39,7 +39,7 @@ export MUSIC_DIR="/path/to/your/music"
 
 
 
-## 󰘳 Usage
+## Usage
 
 Launch the browser:
 
