@@ -60,8 +60,3 @@ fmpc
 | 󱊁 **ESC** | Clear search / Reset view |
 | 󰈆 **Ctrl-q** | Quit |
 
-## 󰆦 Files
-
-* `fmpc`: Main interface and preview logic.
-* `fmpc-play`: Helper script for handling MPD playlist logic.
-
