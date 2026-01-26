@@ -1,3 +1,6 @@
+
+<img width="1643" height="984" alt="Screenshot from 2026-01-26 17-22-09" src="https://github.com/user-attachments/assets/f1c1d27e-9bdf-4620-b286-efb26cefec46" />
+
 # fmpc - Fast MPC Browser
 
 A minimalist, high-performance TUI browser for MPD using `fzf` and `ueberzugpp`.
