@@ -86,8 +86,9 @@ mkfifo "$FIFO_PIPE"
 ueberzugpp layer --silent < <(tail -f "$FIFO_PIPE") &
 echo $! > "$UB_PID_FILE"
 
-# Get current song for initial query
-CURRENT_SONG=$(mpc current -f "%file%" | xargs -I {} basename "{}" | sed "s/^'//;s/'$//")
+# Get current song filename 
+CURRENT_FILE=$(mpc current -f "%file%")
+CURRENT_SONG="${CURRENT_FILE##*/}"
 
 # List coloring
 DIR_COL=$'\e[35m'
