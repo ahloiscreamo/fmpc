@@ -1,5 +1,3 @@
----
-
 # fmpc - Fast MPC Browser
 
 A minimalist, high-performance TUI browser for MPD using `fzf` and `ueberzugpp`.
@@ -67,4 +65,3 @@ fmpc
 * `fmpc`: Main interface and preview logic.
 * `fmpc-play`: Helper script for handling MPD playlist logic.
 
----
