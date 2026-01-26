@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+
+# Helper script for fmpc to play a selected song or songs.
+
+# Exit if no song is provided.
+if [[ -z "$1" ]]; then
+    exit 1
+fi
+
+# If we have more than one argument, it's a list from fzf's {+}.
+# Clear the playlist, add all arguments, and play.
+if [[ "$#" -gt 1 ]]; then
+    mpc clear
+    mpc add "$@" # "$@" expands to all arguments, correctly quoted
+    mpc play
+    exit 0
+fi
+
+# If we only have one argument, do the album-play logic.
+SONG="$1"
+DIR=$(dirname "$SONG")
+
+mpc clear
+mpc add "$DIR"
+mpc searchplay filename "$SONG"
+mpc single off
+mpc repeat off
