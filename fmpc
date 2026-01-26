@@ -110,7 +110,7 @@ mpc listall | sed "s|^\(.*\)/\(.*\)$|${DIR_COL}\1/${FILE_COL}\2${RESET}\t\1/\2|"
     --bind "ctrl-x:execute($HOME/.local/bin/fmpc-play {+2})+deselect-all" \
     --bind "esc:change-query()+top" \
     --bind "change:top" \
-    --bind "ctrl-f:transform-query(mpc current -f '%file%' | xargs -I {} basename \"{}\" | sed \"s/^'//;s/'$//\")" \
+    --bind "ctrl-f:transform-query(mpc current -f '%file%' | sed 's|.*/||')" \
     --bind "ctrl-p:execute-silent(mpc toggle)+refresh-preview" \
     --bind "ctrl-n:execute-silent(mpc next)+refresh-preview" \
     --bind "ctrl-b:execute-silent(mpc prev)+refresh-preview" \
