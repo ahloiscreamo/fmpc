@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# UI Colors
+# ANSI color codes
 G="\033[1;32m"
 Y="\033[1;33m"
 R="\033[1;31m"
@@ -10,28 +10,32 @@ W="\033[0;90m"
 WH="\033[1;37m"
 NC="\033[0m"
 
-# Help menu
+# Help dialog
 if [[ "$1" == "--help" || "$1" == "-h" ]]; then
     echo -e "${M}fmpc${NC} - Fast MPC Browser"
     echo -e "--------------------------------"
     echo -e "${G}ENTER${NC}      : Play highlighted song"
     echo -e "${Y}TAB${NC}        : Select/Deselect multiple songs"
-    echo -e "${G}Ctrl-x${NC}    : Play all selected songs"
-    echo -e "${C}Ctrl-f${NC}    : Search for the currently playing song"
-    echo -e "${M}Ctrl-p/n/b${NC}: Toggle/Next/Prev"
-    echo -e "${R}Ctrl-q${NC}    : Quit"
+    echo -e "${G}Ctrl-x${NC}     : Play all selected songs"
+    echo -e "${C}Ctrl-f${NC}     : Search for the currently playing song"
+    echo -e "${M}Ctrl-p/n/b${NC} : Toggle/Next/Prev"
+    echo -e "${R}Ctrl-q${NC}     : Quit"
     echo -e "${Y}ESC${NC}        : Clear search and jump to top"
     echo -e "--------------------------------"
     exit 0
 fi
 
-# Config & Temp files
+# Paths and temp files
 export MUSIC_DIR="/mnt/Kingston/Music"
 FIFO_PIPE="/tmp/fmpc_fifo"
 UB_PID_FILE="/tmp/fmpc_ub.pid"
 CACHE_DIR="$HOME/.cache/fmpc"
 
-# FZF Preview Handler
+# Set layout here: "right" or "bottom"
+export PREVIEW_POS="bottom"
+PREVIEW_SIZE="50%"
+
+# Handler for fzf preview window
 if [[ "$1" == "--preview" ]]; then
     [[ -z "$2" ]] && exit
     
@@ -43,36 +47,70 @@ if [[ "$1" == "--preview" ]]; then
 
     mkdir -p "$CACHE_DIR"
 
-    # Extract cover if not cached
+    # Extract cover art if missing
     if [[ ! -f "$ALBUM_COVER" ]]; then
         timeout 2s ffmpeg -i "$FULL_PATH" -an -vframes 1 -q:v 2 "$ALBUM_COVER" -y >/dev/null 2>&1
     fi
 
-    # Metadata display
-    echo -e "${W}--------------------------------${NC}"
+    # Center text only if layout is set to bottom
+    center_text() {
+        local text="$1"
+        if [[ "$PREVIEW_POS" == "bottom" ]]; then
+            local clean_text=$(echo -e "$text" | sed 's/\x1b\[[0-9;]*m//g')
+            local width=${FZF_PREVIEW_COLUMNS:-80}
+            local n=${#clean_text}
+            local pad=$(( (width - n) / 2 ))
+            [[ $pad -lt 0 ]] && pad=0
+            printf "%${pad}s" " "
+        fi
+        echo -e "$text"
+    }
+
+    # Draw preview header and metadata
+    SEP_LINE=$(printf '%.0s-' $(seq 1 ${FZF_PREVIEW_COLUMNS:-40}))
+    center_text "${W}${SEP_LINE}${NC}"
+    
     CURRENT=$(mpc current -f "%file%")
     if [[ "$FILE" == "$CURRENT" ]]; then
-        echo -e "${G}[ NOW PLAYING ]${NC}"
+        center_text "${G}[ NOW PLAYING ]${NC}"
     else
-        echo -e "${W}[ Selected ]${NC}"
+        center_text "${W}[ Selected ]${NC}"
     fi
 
-    echo -e "${M}Album:${NC} ${WH}$ALBUM_DIR${NC}"
-    echo -e "${C}Track:${NC} ${WH}${FILE##*/}${NC}"
-    echo -e "${W}--------------------------------${NC}"
+    center_text "${M}Album:${NC} ${WH}$ALBUM_DIR${NC}"
+    center_text "${C}Track:${NC} ${WH}${FILE##*/}${NC}"
+    center_text "${W}${SEP_LINE}${NC}"
 
-    # UeberzugPP draw
+    # Render image using ueberzugpp
     if [[ -f "$ALBUM_COVER" && -p "$FIFO_PIPE" ]]; then
-        OFFSET_Y=$((FZF_PREVIEW_TOP + 6))
-        HEIGHT_ADJUST=$((FZF_PREVIEW_LINES - 6))
+        if [[ "$PREVIEW_POS" == "bottom" ]]; then
+            # Centered layout for bottom mode
+            IMG_H=$((FZF_PREVIEW_LINES - 5))
+            
+            # Use visual square ratio for width
+            VISUAL_SQUARE_WIDTH=$((IMG_H * 5 / 2)) 
+            [[ $VISUAL_SQUARE_WIDTH -gt $FZF_PREVIEW_COLUMNS ]] && VISUAL_SQUARE_WIDTH=$FZF_PREVIEW_COLUMNS
+
+            # Calc X with +2 nudge for centering
+            IMG_X=$(( FZF_PREVIEW_LEFT + (FZF_PREVIEW_COLUMNS - VISUAL_SQUARE_WIDTH) / 2 + 2 ))
+            IMG_W=$VISUAL_SQUARE_WIDTH
+            OFFSET_Y=$((FZF_PREVIEW_TOP + 5))
+        else
+            # Standard left-aligned layout for right mode
+            IMG_X=$FZF_PREVIEW_LEFT
+            IMG_W=$FZF_PREVIEW_COLUMNS
+            IMG_H=$((FZF_PREVIEW_LINES - 6))
+            OFFSET_Y=$((FZF_PREVIEW_TOP + 6))
+        fi
+
         printf '{"action": "remove", "identifier": "fmpc-preview"}\n' > "$FIFO_PIPE"
         printf '{"action": "add", "identifier": "fmpc-preview", "x": %d, "y": %d, "width": %d, "height": %d, "scaler": "contain", "path": "%s"}\n' \
-            "$FZF_PREVIEW_LEFT" "$OFFSET_Y" "$FZF_PREVIEW_COLUMNS" "$HEIGHT_ADJUST" "$ALBUM_COVER" > "$FIFO_PIPE"
+            "$IMG_X" "$OFFSET_Y" "$IMG_W" "$IMG_H" "$ALBUM_COVER" > "$FIFO_PIPE"
     fi
     exit
 fi
 
-# Cleanup on exit
+# Kill background processes and clean up
 cleanup() {
     [ -f "$UB_PID_FILE" ] && kill "$(cat "$UB_PID_FILE")" 2>/dev/null
     rm -f "$UB_PID_FILE" "$FIFO_PIPE"
@@ -80,32 +118,43 @@ cleanup() {
 }
 trap cleanup EXIT
 
-# Initialize UeberzugPP
+# Start ueberzugpp layer
 rm -f "$FIFO_PIPE"
 mkfifo "$FIFO_PIPE"
 ueberzugpp layer --silent < <(tail -f "$FIFO_PIPE") &
 echo $! > "$UB_PID_FILE"
 
-# Get current song filename 
+# Track current song for fzf initial query
 CURRENT_FILE=$(mpc current -f "%file%")
 CURRENT_SONG="${CURRENT_FILE##*/}"
 
-# List coloring
+# TUI formatting
 DIR_COL=$'\e[35m'
 FILE_COL=$'\e[37m'
 RESET=$'\e[0m'
 
-# Main UI
-mpc listall | sed "s|^\(.*\)/\(.*\)$|${DIR_COL}\1/${FILE_COL}\2${RESET}\t\1/\2|" | fzf \
+# Switch list formatting and header based on layout
+if [[ "$PREVIEW_POS" == "bottom" ]]; then
+    LIST_CMD="mpc listall | sed \"s|^.*/\(.*\)$|${FILE_COL}\1${RESET}\t&|\""
+    L1="ENTER ${G}${NC} Play ${W}|${NC} TAB ${Y}󰄳${NC} Sel   ${W}|${NC} C-x ${G}${NC} Play Sel"
+    L2="C-q ${R}${NC} Quit   ${W}|${NC} ESC ${M}${NC} Clear ${W}|${NC} C-f ${C}${NC} Find"
+    HEADER_TEXT=$(echo -e "$L1\n$L2")
+else
+    LIST_CMD="mpc listall | sed \"s|^\(.*\)/\(.*\)$|${DIR_COL}\1/${FILE_COL}\2${RESET}\t\1/\2|\""
+    HEADER_TEXT=$(echo -e "ENTER ${G}${NC} Play ${W}|${NC} TAB ${Y}󰄳${NC} Sel ${W}|${NC} C-x ${G}${NC} Play Sel ${W}|${NC} C-q ${R}${NC} Quit ${W}|${NC} ESC ${M}${NC} Clear ${W}|${NC} C-f ${C}${NC} Find")
+fi
+
+# Launch fzf
+eval "$LIST_CMD" | fzf \
     --ansi \
     --delimiter '\t' \
     --with-nth=1 \
     --query "$CURRENT_SONG" \
     --multi \
-    --header "$(echo -e "ENTER ${G}${NC} Play | TAB ${Y}󰄳${NC} Sel | C-x ${G}${NC} Play Sel | C-q ${R}${NC} Quit | ESC ${M}${NC} Clear | C-f ${C}${NC} Find")" \
+    --header "$HEADER_TEXT" \
     --prompt " 󰎆 Music > " \
     --preview "$0 --preview {2}" \
-    --preview-window="right:40%:border-rounded" \
+    --preview-window="${PREVIEW_POS}:${PREVIEW_SIZE}:border-rounded" \
     --bind "enter:execute($HOME/.local/bin/fmpc-play {2})+refresh-preview" \
     --bind "ctrl-x:execute($HOME/.local/bin/fmpc-play {+2})+deselect-all" \
     --bind "esc:change-query()+top" \
