@@ -1,5 +1,6 @@
 
-<img width="1643" height="984" alt="Screenshot from 2026-01-26 17-22-09" src="https://github.com/user-attachments/assets/f1c1d27e-9bdf-4620-b286-efb26cefec46" />
+<img width="634" height="1030" alt="Screenshot from 2026-01-26 21-37-42" src="https://github.com/user-attachments/assets/cb0c57ce-4814-4d33-9752-847d4df771a2" />
+<img width="1618" height="1009" alt="Screenshot from 2026-01-26 21-45-24" src="https://github.com/user-attachments/assets/021ebc81-c69a-494f-aaa0-219cdff7db63" />
 
 # fmpc - Fast MPC Browser
 
