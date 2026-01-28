@@ -112,6 +112,8 @@ fi
 
 # Kill background processes and clean up
 cleanup() {
+    tput cnorm  # Restore cursor
+    tput rmcup  # Restore main screen
     [ -f "$UB_PID_FILE" ] && kill "$(cat "$UB_PID_FILE")" 2>/dev/null
     rm -f "$UB_PID_FILE" "$FIFO_PIPE"
     exit
