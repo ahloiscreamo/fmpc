@@ -110,25 +110,52 @@ if [[ "$1" == "--preview" ]]; then
     exit
 fi
 
-# Kill background processes and clean up
+# Clean up our mess on exit
 cleanup() {
-    tput cnorm  # Restore cursor
-    tput rmcup  # Restore main screen
-    [ -f "$UB_PID_FILE" ] && kill "$(cat "$UB_PID_FILE")" 2>/dev/null
-    rm -f "$UB_PID_FILE" "$FIFO_PIPE"
+    # The follower script now has its own trap to clean up its children.
+    # We just need to send it a normal termination signal (SIGTERM).
+    if [ -f "$FOLLOW_PID_FILE" ]; then
+        follower_pid=$(cat "$FOLLOW_PID_FILE")
+        kill "$follower_pid" 2>/dev/null
+    fi
+    [ -f "$UB_PID_FILE" ] && kill -9 "$(cat "$UB_PID_FILE")" 2>/dev/null # kill ueberzug too
+
+    # now it's safe to restore the terminal
+    tput cnorm; tput rmcup;
+
+    # and finally, delete the temp files. no sleep needed.
+    rm -f "$UB_PID_FILE" "$FIFO_PIPE" "$FOLLOW_PID_FILE" "$LIST_CACHE" "$FZF_SOCK_PATH"
     exit
 }
 trap cleanup EXIT
 
-# Start ueberzugpp layer
+
+# --- Setup ---
+
+# ueberzug++ for album art
 rm -f "$FIFO_PIPE"
 mkfifo "$FIFO_PIPE"
 ueberzugpp layer --silent < <(tail -f "$FIFO_PIPE") &
 echo $! > "$UB_PID_FILE"
 
-# Track current song for fzf initial query
-CURRENT_FILE=$(mpc current -f "%file%")
-CURRENT_SONG="${CURRENT_FILE##*/}"
+# File paths
+LIST_CACHE="/tmp/fmpc_list_cache"
+FOLLOW_PID_FILE="/tmp/fmpc_follow.pid"
+FZF_SOCK_PATH="/tmp/fmpc.sock"
+FOLLOWER_SCRIPT="$HOME/.local/bin/fmpc-follower"
+
+# Cache mpc's full list for much faster lookups later
+mpc listall > "$LIST_CACHE"
+
+# Figure out where to jump on start
+current_file=$(mpc current -f "%file%")
+initial_jump_index=1 # default to top
+if [[ -n "$current_file" ]]; then
+    index_from_awk=$(awk -v song="$current_file" '$0 == song { print NR; exit }' "$LIST_CACHE")
+    if [[ -n "$index_from_awk" ]]; then
+        initial_jump_index=$index_from_awk
+    fi
+fi
 
 # TUI formatting
 DIR_COL=$'\e[35m'
@@ -137,34 +164,41 @@ RESET=$'\e[0m'
 
 # Switch list formatting and header based on layout
 if [[ "$PREVIEW_POS" == "bottom" ]]; then
-    LIST_CMD="mpc listall | sed \"s|^.*/\(.*\)$|${FILE_COL}\1${RESET}\t&|\""
+    # Use sed on the cache file instead of piping mpc listall every time
+    LIST_CMD="sed \"s|^.*/\(.*\)$|${FILE_COL}\1${RESET}\t&|\" $LIST_CACHE"
     L1="ENTER ${G}${NC} Play ${W}|${NC} TAB ${Y}󰄳${NC} Sel   ${W}|${NC} C-x ${G}${NC} Play Sel"
     L2="C-q ${R}${NC} Quit   ${W}|${NC} ESC ${M}${NC} Clear ${W}|${NC} C-f ${C}${NC} Find"
     HEADER_TEXT=$(echo -e "$L1\n$L2")
 else
-    LIST_CMD="mpc listall | sed \"s|^\(.*\)/\(.*\)$|${DIR_COL}\1/${FILE_COL}\2${RESET}\t\1/\2|\""
+    LIST_CMD="sed \"s|^\(.*\)/\(.*\)$|${DIR_COL}\1/${FILE_COL}\2${RESET}\t\1/\2|\" $LIST_CACHE"
     HEADER_TEXT=$(echo -e "ENTER ${G}${NC} Play ${W}|${NC} TAB ${Y}󰄳${NC} Sel ${W}|${NC} C-x ${G}${NC} Play Sel ${W}|${NC} C-q ${R}${NC} Quit ${W}|${NC} ESC ${M}${NC} Clear ${W}|${NC} C-f ${C}${NC} Find")
 fi
 
-# Launch fzf
+
+# --- Launch fzf ---
+
+# Note: --listen tells fzf to use our specified socket
+# 'start:execute(...)' launches our follower script in the background
 eval "$LIST_CMD" | fzf \
     --ansi \
     --delimiter '\t' \
     --with-nth=1 \
-    --query "$CURRENT_SONG" \
     --multi \
+    --listen="$FZF_SOCK_PATH" \
     --header "$HEADER_TEXT" \
     --prompt " 󰎆 Music > " \
     --preview "$0 --preview {2}" \
     --preview-window="${PREVIEW_POS}:${PREVIEW_SIZE}:border-rounded" \
-    --bind "enter:execute($HOME/.local/bin/fmpc-play {2})+refresh-preview" \
-    --bind "ctrl-x:execute($HOME/.local/bin/fmpc-play {+2})+deselect-all" \
+    --bind "load:pos($initial_jump_index)" \
+    --bind "start:execute($FOLLOWER_SCRIPT '$LIST_CACHE' '$FZF_SOCK_PATH' & echo \$! > '$FOLLOW_PID_FILE')" \
+    --bind "enter:execute-silent($HOME/.local/bin/fmpc-play {2} >/dev/null 2>&1)+refresh-preview" \
+    --bind "ctrl-x:execute($HOME/.local/bin/fmpc-play {+2} >/dev/null 2>&1)+deselect-all" \
     --bind "esc:change-query()+top" \
     --bind "change:top" \
     --bind "ctrl-f:transform-query(mpc current -f '%file%' | sed 's|.*/||')" \
-    --bind "ctrl-p:execute-silent(mpc toggle)+refresh-preview" \
-    --bind "ctrl-n:execute-silent(mpc next)+refresh-preview" \
-    --bind "ctrl-b:execute-silent(mpc prev)+refresh-preview" \
-    --bind "ctrl-u:execute-silent(mpc update)+refresh-preview" \
+    --bind "ctrl-p:execute-silent(mpc toggle >/dev/null 2>&1)+refresh-preview" \
+    --bind "ctrl-n:execute-silent(mpc next >/dev/null 2>&1)+refresh-preview" \
+    --bind "ctrl-b:execute-silent(mpc prev >/dev/null 2>&1)+refresh-preview" \
+    --bind "ctrl-u:execute-silent(mpc update >/dev/null 2>&1)+refresh-preview" \
     --bind "ctrl-q:abort" \
     --reverse --border

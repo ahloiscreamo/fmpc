@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+
+# This is a helper script for fmpc's "follow mode".
+# It should not be run directly.
+
+LIST_CACHE_PATH="$1"
+FZF_SOCK_PATH="$2"
+
+# Exit if we don't have the tools we need.
+if [[ ! -f "$LIST_CACHE_PATH" || -z "$FZF_SOCK_PATH" ]]; then
+    exit 1
+fi
+
+# When this script exits, kill all of its background jobs.
+# This ensures the 'mpc idleloop' and the 'while' loop subshell die with it.
+cleanup() {
+    kill $(jobs -p) 2>/dev/null
+}
+trap cleanup EXIT
+
+# Run the whole listener pipeline in the background
+mpc idleloop player | while read -r; do
+    # This check prevents awk errors if the cache was deleted after fmpc quit
+    if [[ ! -f "$LIST_CACHE_PATH" ]]; then
+        break
+    fi
+
+    current_file=$(mpc current -f "%file%")
+    if [[ -n "$current_file" ]]; then
+        # Find the new song in the cached list
+        new_index=$(awk -v song="$current_file" '$0 == song { print NR; exit }' "$LIST_CACHE_PATH")
+        if [[ -n "$new_index" ]]; then
+            # Tell the running fzf instance to jump to the new line
+            curl --unix-socket "$FZF_SOCK_PATH" http -d "pos($new_index)" >/dev/null 2>&1
+        fi
+    fi
+done &
+
+# Wait for the background pipeline to finish.
+# This script will now block here until it receives a signal to terminate.
+wait
