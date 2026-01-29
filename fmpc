@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# ANSI color codes
+# colors
 G="\033[1;32m"
 Y="\033[1;33m"
 R="\033[1;31m"
@@ -10,32 +10,29 @@ W="\033[0;90m"
 WH="\033[1;37m"
 NC="\033[0m"
 
-# Help dialog
+# help text
 if [[ "$1" == "--help" || "$1" == "-h" ]]; then
     echo -e "${M}fmpc${NC} - Fast MPC Browser"
     echo -e "--------------------------------"
-    echo -e "${G}ENTER${NC}      : Play highlighted song"
-    echo -e "${Y}TAB${NC}        : Select/Deselect multiple songs"
-    echo -e "${G}Ctrl-x${NC}     : Play all selected songs"
-    echo -e "${C}Ctrl-f${NC}     : Search for the currently playing song"
+    echo -e "${G}ENTER${NC}      : Play song"
+    echo -e "${Y}TAB${NC}        : Select multi"
+    echo -e "${G}Ctrl-x${NC}     : Play selection"
+    echo -e "${C}Ctrl-f${NC}     : Search current"
     echo -e "${M}Ctrl-p/n/b${NC} : Toggle/Next/Prev"
     echo -e "${R}Ctrl-q${NC}     : Quit"
-    echo -e "${Y}ESC${NC}        : Clear search and jump to top"
     echo -e "--------------------------------"
     exit 0
 fi
 
-# Paths and temp files
+# paths
 export MUSIC_DIR="/mnt/Kingston/Music"
 FIFO_PIPE="/tmp/fmpc_fifo"
 UB_PID_FILE="/tmp/fmpc_ub.pid"
 CACHE_DIR="$HOME/.cache/fmpc"
-
-# Set layout here: "right" or "bottom"
-export PREVIEW_POS="bottom"
+export PREVIEW_POS="bottom" #bottom/right
 PREVIEW_SIZE="50%"
 
-# Handler for fzf preview window
+# fzf preview logic
 if [[ "$1" == "--preview" ]]; then
     [[ -z "$2" ]] && exit
     
@@ -47,12 +44,12 @@ if [[ "$1" == "--preview" ]]; then
 
     mkdir -p "$CACHE_DIR"
 
-    # Extract cover art if missing
+    # get the cover
     if [[ ! -f "$ALBUM_COVER" ]]; then
         timeout 2s ffmpeg -i "$FULL_PATH" -an -vframes 1 -q:v 2 "$ALBUM_COVER" -y >/dev/null 2>&1
     fi
 
-    # Center text only if layout is set to bottom
+    # text centering 
     center_text() {
         local text="$1"
         if [[ "$PREVIEW_POS" == "bottom" ]]; then
@@ -66,7 +63,7 @@ if [[ "$1" == "--preview" ]]; then
         echo -e "$text"
     }
 
-    # Draw preview header and metadata
+    # metadata display
     SEP_LINE=$(printf '%.0s-' $(seq 1 ${FZF_PREVIEW_COLUMNS:-40}))
     center_text "${W}${SEP_LINE}${NC}"
     
@@ -81,22 +78,33 @@ if [[ "$1" == "--preview" ]]; then
     center_text "${C}Track:${NC} ${WH}${FILE##*/}${NC}"
     center_text "${W}${SEP_LINE}${NC}"
 
-    # Render image using ueberzugpp
+# image rendering
     if [[ -f "$ALBUM_COVER" && -p "$FIFO_PIPE" ]]; then
         if [[ "$PREVIEW_POS" == "bottom" ]]; then
-            # Centered layout for bottom mode
+            # get real pixels
+            dims=$(ffprobe -v error -select_streams v:0 -show_entries stream=width,height -of csv=s=x:p=0 "$ALBUM_COVER")
+            IFS=x read -r W_PX H_PX <<< "$dims"
+            [[ -z "$W_PX" || -z "$H_PX" ]] && { W_PX=1; H_PX=1; }
+            
+            # anchor to top of image area (line 5)
+            OFFSET_Y=$((FZF_PREVIEW_TOP + 5))
+            # fill every line down to the bottom border
             IMG_H=$((FZF_PREVIEW_LINES - 5))
             
-            # Use visual square ratio for width
-            VISUAL_SQUARE_WIDTH=$((IMG_H * 5 / 2)) 
-            [[ $VISUAL_SQUARE_WIDTH -gt $FZF_PREVIEW_COLUMNS ]] && VISUAL_SQUARE_WIDTH=$FZF_PREVIEW_COLUMNS
+            # manual tuning - bump this if it's still left
+            # try 1, 2, or 3 until image is centered
+            MANUAL_ADJUST=2
+            
+            # ratio-based width
+            # we use 2.5 here to give it plenty of "stretch" room
+            IMG_W=$(( IMG_H * W_PX / H_PX * 25 / 10 ))
 
-            # Calc X with +2 nudge for centering
-            IMG_X=$(( FZF_PREVIEW_LEFT + (FZF_PREVIEW_COLUMNS - VISUAL_SQUARE_WIDTH) / 2 + 2 ))
-            IMG_W=$VISUAL_SQUARE_WIDTH
-            OFFSET_Y=$((FZF_PREVIEW_TOP + 5))
+            # cap it so it doesn't break out of fzf
+            [[ $IMG_W -gt $FZF_PREVIEW_COLUMNS ]] && IMG_W=$FZF_PREVIEW_COLUMNS
+
+            # centering math with the manual nudge
+            IMG_X=$(( FZF_PREVIEW_LEFT + (FZF_PREVIEW_COLUMNS - IMG_W) / 2 + MANUAL_ADJUST ))
         else
-            # Standard left-aligned layout for right mode
             IMG_X=$FZF_PREVIEW_LEFT
             IMG_W=$FZF_PREVIEW_COLUMNS
             IMG_H=$((FZF_PREVIEW_LINES - 6))
@@ -110,75 +118,57 @@ if [[ "$1" == "--preview" ]]; then
     exit
 fi
 
-# Clean up our mess on exit
+# kill background procs on exit
 cleanup() {
-    # The follower script now has its own trap to clean up its children.
-    # We just need to send it a normal termination signal (SIGTERM).
     if [ -f "$FOLLOW_PID_FILE" ]; then
         follower_pid=$(cat "$FOLLOW_PID_FILE")
         kill "$follower_pid" 2>/dev/null
     fi
-    [ -f "$UB_PID_FILE" ] && kill -9 "$(cat "$UB_PID_FILE")" 2>/dev/null # kill ueberzug too
-
-    # now it's safe to restore the terminal
+    [ -f "$UB_PID_FILE" ] && kill -9 "$(cat "$UB_PID_FILE")" 2>/dev/null
     tput cnorm; tput rmcup;
-
-    # and finally, delete the temp files. no sleep needed.
     rm -f "$UB_PID_FILE" "$FIFO_PIPE" "$FOLLOW_PID_FILE" "$LIST_CACHE" "$FZF_SOCK_PATH"
     exit
 }
 trap cleanup EXIT
 
-
-# --- Setup ---
-
-# ueberzug++ for album art
+# init ueberzug
 rm -f "$FIFO_PIPE"
 mkfifo "$FIFO_PIPE"
 ueberzugpp layer --silent < <(tail -f "$FIFO_PIPE") &
 echo $! > "$UB_PID_FILE"
 
-# File paths
 LIST_CACHE="/tmp/fmpc_list_cache"
 FOLLOW_PID_FILE="/tmp/fmpc_follow.pid"
 FZF_SOCK_PATH="/tmp/fmpc.sock"
 FOLLOWER_SCRIPT="$HOME/.local/bin/fmpc-follower"
 
-# Cache mpc's full list for much faster lookups later
+# cache list for speed
 mpc listall > "$LIST_CACHE"
 
-# Figure out where to jump on start
+# initial scroll pos
 current_file=$(mpc current -f "%file%")
-initial_jump_index=1 # default to top
+initial_jump_index=1
 if [[ -n "$current_file" ]]; then
     index_from_awk=$(awk -v song="$current_file" '$0 == song { print NR; exit }' "$LIST_CACHE")
-    if [[ -n "$index_from_awk" ]]; then
-        initial_jump_index=$index_from_awk
-    fi
+    [[ -n "$index_from_awk" ]] && initial_jump_index=$index_from_awk
 fi
 
-# TUI formatting
 DIR_COL=$'\e[35m'
 FILE_COL=$'\e[37m'
 RESET=$'\e[0m'
 
-# Switch list formatting and header based on layout
+# formatting
 if [[ "$PREVIEW_POS" == "bottom" ]]; then
-    # Use sed on the cache file instead of piping mpc listall every time
     LIST_CMD="sed \"s|^.*/\(.*\)$|${FILE_COL}\1${RESET}\t&|\" $LIST_CACHE"
     L1="ENTER ${G}${NC} Play ${W}|${NC} TAB ${Y}󰄳${NC} Sel   ${W}|${NC} C-x ${G}${NC} Play Sel"
-    L2="C-q ${R}${NC} Quit   ${W}|${NC} ESC ${M}${NC} Clear ${W}|${NC} C-f ${C}${NC} Find"
+    L2="C-q   ${R}${NC} Quit ${W}|${NC} ESC ${M}${NC} Clear ${W}|${NC} C-f ${C}${NC} Find"
     HEADER_TEXT=$(echo -e "$L1\n$L2")
 else
     LIST_CMD="sed \"s|^\(.*\)/\(.*\)$|${DIR_COL}\1/${FILE_COL}\2${RESET}\t\1/\2|\" $LIST_CACHE"
     HEADER_TEXT=$(echo -e "ENTER ${G}${NC} Play ${W}|${NC} TAB ${Y}󰄳${NC} Sel ${W}|${NC} C-x ${G}${NC} Play Sel ${W}|${NC} C-q ${R}${NC} Quit ${W}|${NC} ESC ${M}${NC} Clear ${W}|${NC} C-f ${C}${NC} Find")
 fi
 
-
-# --- Launch fzf ---
-
-# Note: --listen tells fzf to use our specified socket
-# 'start:execute(...)' launches our follower script in the background
+# fire it up
 eval "$LIST_CMD" | fzf \
     --ansi \
     --delimiter '\t' \
