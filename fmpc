@@ -65,18 +65,24 @@ if [[ "$1" == "--preview" ]]; then
         echo -e "$text"
     }
 
-    # metadata display 
+   # metadata display 
+    SEP_LINE=$(printf '%.0s-' $(seq 1 ${FZF_PREVIEW_COLUMNS:-40}))
     CURRENT=$(mpc current -f "%file%")
+
     if [[ "$FILE" == "$CURRENT" ]]; then
         center_text "${G}[ NOW PLAYING ]${NC}"
     else
         center_text "${W}[ Selected ]${NC}"
     fi
 
+    [[ "$PREVIEW_POS" == "right" ]] && center_text "${W}${SEP_LINE}${NC}"
+
     center_text "${M}Album:${NC} ${WH}$ALBUM_DIR${NC}"
     center_text "${C}Track:${NC} ${WH}${FILE##*/}${NC}"
 
-# image rendering
+    [[ "$PREVIEW_POS" == "right" ]] && center_text "${W}${SEP_LINE}${NC}"
+
+    # image rendering
     if [[ -f "$ALBUM_COVER" && -p "$FIFO_PIPE" ]]; then
         if [[ "$PREVIEW_POS" == "bottom" ]]; then
             # get real pixels
@@ -160,12 +166,12 @@ if [[ "$PREVIEW_POS" == "bottom" ]]; then
     LIST_CMD="sed \"s|^.*/\(.*\)$|${FILE_COL}\1${RESET}\t&|\" $LIST_CACHE"
     L1="ENTER ${G}${NC} Play ${W}|${NC} TAB ${Y}󰄳${NC} Sel   ${W}|${NC} C-x ${G}${NC} Play Sel"
     L2="C-q   ${R}${NC} Quit ${W}|${NC} ESC ${M}${NC} Clear ${W}|${NC} C-f ${C}${NC} Find"
-    L3="C-p ${G}󰐎${NC} Toggle ${W}|${NC} C-n ${G}󰒭${NC} Next  ${W}|${NC} C-b ${G}󰒮${NC} Prev"
+    L3="C-n   ${M}󰒭${NC} Next ${W}|${NC} C-b ${Y}󰒮${NC} Prev  ${W}|${NC} C-p ${R}󰐎${NC} Toggle"
     HEADER_TEXT=$(echo -e "$L1\n$L2\n$L3")
 else
     LIST_CMD="sed \"s|^\(.*\)/\(.*\)$|${DIR_COL}\1/${FILE_COL}\2${RESET}\t\1/\2|\" $LIST_CACHE"
     RL1="ENTER ${G}${NC} Play ${W}|${NC} TAB ${Y}󰄳${NC} Sel ${W}|${NC} C-x ${G}${NC} Play Sel ${W}|${NC} C-q ${R}${NC} Quit ${W}|${NC} ESC ${M}${NC} Clear ${W}|${NC} C-f ${C}${NC} Find"
-    RL2="C-p ${G}󰐎${NC} Toggle ${W}|${NC} C-n ${G}󰒭${NC} Next ${W}|${NC} C-b ${G}󰒮${NC} Prev"
+    RL2="C-p ${R}󰐎${NC} Toggle ${W}|${NC} C-n ${M}󰒭${NC} Next ${W}|${NC} C-b ${Y}󰒮${NC} Prev"
     HEADER_TEXT=$(echo -e "$RL1\n$RL2")   
     fi
 
