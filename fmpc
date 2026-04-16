@@ -18,7 +18,11 @@ if [[ "$1" == "--help" || "$1" == "-h" ]]; then
     echo -e "${Y}TAB${NC}        : Select multi"
     echo -e "${G}Ctrl-x${NC}     : Play selection"
     echo -e "${C}Ctrl-f${NC}     : Search current"
-    echo -e "${M}Ctrl-p/n/b${NC} : Toggle/Next/Prev"
+    echo -e "${M}Ctrl-p${NC}     : Toggle play/pause"
+    echo -e "${M}Ctrl-n${NC}     : Next track"
+    echo -e "${M}Ctrl-b${NC}     : Prev track"
+    echo -e "${Y}Ctrl-u${NC}     : Update database"
+    echo -e "${W}ESC${NC}        : Clear search"
     echo -e "${R}Ctrl-q${NC}     : Quit"
     echo -e "--------------------------------"
     exit 0
