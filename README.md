@@ -2,11 +2,9 @@
 <img width="641" height="1034" alt="Screenshot from 2026-04-16 14-53-12" src="https://github.com/user-attachments/assets/75b0471b-430d-4219-a04e-b3f9b430aec5" />
 
 # fmpc - Fast MPC Browser
-
 A minimalist, high-performance TUI browser for MPD using `fzf` and `ueberzugpp`.
 
 ## Features
-
 * **Cover Art**: Renders album art using Ueberzug++.
 * **Layouts**: Supports "Right" or "Bottom" preview modes (centered).
 * **Search**: Uses `fzf` for instant library filtering.
@@ -15,57 +13,58 @@ A minimalist, high-performance TUI browser for MPD using `fzf` and `ueberzugpp`.
 * **UI**: Simple ANSI colors with grey dividers for a cleaner look.
 
 ## Dependencies
-
-* `mpd` / `mpc`
-* `fzf`
-* `ueberzugpp`
-* `ffmpeg` (for cover extraction)
-* `Nerd Fonts`
+| Dependency | Role |
+|---|---|
+| `mpd` | Music daemon — manages playback and your library |
+| `mpc` | CLI client used internally to control MPD |
+| `fzf` | Fuzzy finder powering the search and browser UI |
+| `ueberzugpp` | Renders album art in the terminal |
+| `ffmpeg` | Extracts embedded cover art from audio files |
+| Nerd Fonts | Required for icons in the UI |
 
 ## Installation
 
-1. Clone the repository and move both scripts to your bin directory:
+1. Clone the repository:
 ```bash
-chmod +x fmpc fmpc-play fmpc-follower
-cp fmpc fmpc-play fmpc-follower ~/.local/bin/
-
+git clone https://github.com/user/fmpc && cd fmpc
 ```
 
-2. Open `fmpc` and configure your music path:
-
+2. Run the install script:
 ```bash
-export MUSIC_DIR="/path/to/your/music"
-
+bash install.sh
 ```
 
-3. Choose your preferred layout at the top of the script:
+> **Note:** A custom install location can be passed as an argument: `bash install.sh /custom/path`.
+> For contributors, `--dev` installs via symlinks so edits to the repo take effect immediately.
 
+3. Configure fmpc by creating `~/.config/fmpc/config`:
 ```bash
-export PREVIEW_POS="right" # Change to "bottom" for centered view
-
+# vim: set ft=bash:
+export MUSIC_DIR="/path/to/your/music"  # defaults to your mpd.conf music_directory
+export PREVIEW_POS="right"              # right|bottom
+export PREVIEW_SIZE="50%"
 ```
+
+> **Note:** Never edit the scripts directly for configuration — use the config file above so your
+> settings are preserved across updates and reinstalls.
 
 ## Usage
 
-Launch the browser:
-
 ```bash
 fmpc
-
 ```
 
-### Keybindings/--help
+### Keybindings
 
 | Key | Action |
-| --- | --- |
-| **ENTER** | Play highlighted song |
-| **TAB** | Select/Deselect multiple songs |
+|---|---|
+| **Enter** | Play highlighted song |
+| **Tab** | Select/Deselect multiple songs |
 | **Ctrl-x** | Play all selected songs |
-| **Ctrl-f** | Search for current playing song |
-| **Ctrl-p** | Toggle Play/Pause |
-| **Ctrl-n** | Next Track |
-| **Ctrl-b** | Previous Track |
+| **Ctrl-f** | Search for currently playing song |
+| **Ctrl-p** | Toggle play/pause |
+| **Ctrl-n** | Next track |
+| **Ctrl-b** | Previous track |
 | **Ctrl-u** | Update MPD database |
-| **ESC** | Clear search / Reset view |
+| **Esc** | Clear search / reset view |
 | **Ctrl-q** | Quit |
-
