@@ -28,13 +28,20 @@ if [[ "$1" == "--help" || "$1" == "-h" ]]; then
     exit 0
 fi
 
-# paths
-export MUSIC_DIR="/mnt/Kingston/Music"
+# user configuration — override these in ~/.config/fmpc/config
+export MUSIC_DIR=$(grep music_directory ~/.config/mpd/mpd.conf | awk '{print $2}' | tr -d '"')
+export PREVIEW_POS="right" # [right|bottom]
+PREVIEW_SIZE="50%"
+
+# source user config if it exists, overriding the defaults above
+# edit ~/.config/fmpc/config instead of this file to avoid conflicts with git
+CONFIG_FILE="${XDG_CONFIG_HOME:-$HOME/.config}/fmpc/config"
+[[ -f "$CONFIG_FILE" ]] && source "$CONFIG_FILE"
+
+# internal runtime paths — do not edit
 FIFO_PIPE="/tmp/fmpc_fifo"
 UB_PID_FILE="/tmp/fmpc_ub.pid"
 CACHE_DIR="$HOME/.cache/fmpc"
-export PREVIEW_POS="bottom" #bottom/right
-PREVIEW_SIZE="50%"
 
 # fzf preview logic
 if [[ "$1" == "--preview" ]]; then
