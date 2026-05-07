@@ -26,7 +26,7 @@ A minimalist, high-performance TUI browser for MPD using `fzf` and `ueberzugpp`.
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/user/fmpc && cd fmpc
+git clone https://github.com/ahloiscreamo/fmpc && cd fmpc
 ```
 
 2. Run the install script:
