@@ -5,12 +5,12 @@
 A minimalist, high-performance TUI browser for MPD using `fzf` and `ueberzugpp`.
 
 ## Features
-* **Cover Art**: Renders album art using Ueberzug++.
-* **Layouts**: Supports "Right" or "Bottom" preview modes (centered).
-* **Search**: Uses `fzf` for instant library filtering.
-* **Selection**: Select multiple tracks or albums with TAB to queue them.
-* **Sync**: Auto-selects the currently playing song on startup & follow-focus song.
-* **UI**: Simple ANSI colors with grey dividers for a cleaner look.
+* **Cover Art Rendering**: Supports high-performance image rendering (including **Sixel** out of the box).
+* **Flexible Layouts**: Supports "Right" or "Bottom" preview modes with custom centering.
+* **Instant Filtering**: Uses `fzf` for super fast library searching.
+* **Batch Selection**: Select multiple tracks or folders with `TAB` to queue them.
+* **Synchronization**: Auto-selects the currently playing song on startup & supports follow-focus mode.
+* **Minimalist UI**: Simple ANSI colors with grey dividers for a cleaner terminal aesthetic.
 
 ## Dependencies
 | Dependency | Role |
@@ -18,8 +18,8 @@ A minimalist, high-performance TUI browser for MPD using `fzf` and `ueberzugpp`.
 | `mpd` | Music daemon — manages playback and your library |
 | `mpc` | CLI client used internally to control MPD |
 | `fzf` | Fuzzy finder powering the search and browser UI |
-| `ueberzugpp` | Renders album art in the terminal |
-| `ffmpeg` | Extracts embedded cover art from audio files |
+| `ueberzugpp` | Renders album art in the terminal (supports sixel, kitty, iterm2, etc.) |
+| `ffmpeg` | Extracts embedded cover art and queries dimensions (`ffprobe`) |
 | Nerd Fonts | Required for icons in the UI |
 
 ## Installation
@@ -40,13 +40,26 @@ bash install.sh
 3. Configure fmpc by creating `~/.config/fmpc/config`:
 ```bash
 # vim: set ft=bash:
-export MUSIC_DIR="/path/to/your/music"  # defaults to your mpd.conf music_directory
-export PREVIEW_POS="right"              # right|bottom
+export MUSIC_DIR="/path/to/your/music"       # defaults to your mpd.conf music_directory
+export PREVIEW_POS="right"                   # right|bottom
 export PREVIEW_SIZE="50%"
+
+# --- Optional Advanced Image Tuning ---
+
+# Image rendering protocol (sixel, kitty, iterm2, x11, wayland, chafa)
+export UB_OUTPUT="sixel"                     # defaults to sixel
+
+# Custom offsets for bottom layout (PREVIEW_POS="bottom")
+# export BOTTOM_OFFSET_Y="3"                 # push image down from top (rows)
+# export BOTTOM_H_ADJUST="3"                 # shrink image height to fit (rows)
+# export BOTTOM_MANUAL_ADJUST="2"            # nudge right to center the image (columns)
+
+# Custom offsets for right layout (PREVIEW_POS="right")
+# export RIGHT_OFFSET_Y="6"                  # push image down from top (rows)
+# export RIGHT_H_ADJUST="6"                  # shrink image height to fit (rows)
 ```
 
-> **Note:** Never edit the scripts directly for configuration — use the config file above so your
-> settings are preserved across updates and reinstalls.
+> **Note:** Never edit the scripts directly for configuration — use the config file above so your settings are preserved across updates and reinstalls.
 
 ## Usage
 
