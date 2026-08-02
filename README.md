@@ -50,13 +50,13 @@ export PREVIEW_SIZE="50%"
 export UB_OUTPUT="sixel"                     # defaults to sixel
 
 # Custom offsets for bottom layout (PREVIEW_POS="bottom")
-# export BOTTOM_OFFSET_Y="3"                 # push image down from top (rows)
-# export BOTTOM_H_ADJUST="3"                 # shrink image height to fit (rows)
+# export BOTTOM_OFFSET_Y="0"                 # push image down from top (rows)
+# export BOTTOM_H_ADJUST="0"                 # shrink image height to fit (rows)
 # export BOTTOM_MANUAL_ADJUST="2"            # nudge right to center the image (columns)
 
 # Custom offsets for right layout (PREVIEW_POS="right")
-# export RIGHT_OFFSET_Y="6"                  # push image down from top (rows)
-# export RIGHT_H_ADJUST="6"                  # shrink image height to fit (rows)
+# export RIGHT_OFFSET_Y="0"                  # push image down from top (rows)
+# export RIGHT_H_ADJUST="0"                  # shrink image height to fit (rows)
 ```
 
 > **Note:** Never edit the scripts directly for configuration — use the config file above so your settings are preserved across updates and reinstalls.
@@ -79,5 +79,6 @@ fmpc
 | **Ctrl-n** | Next track |
 | **Ctrl-b** | Previous track |
 | **Ctrl-u** | Update MPD database |
+| **?** | Show shortcut help modal |
 | **Esc** | Clear search / reset view |
 | **Ctrl-q** | Quit |
