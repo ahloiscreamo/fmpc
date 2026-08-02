@@ -1,5 +1,5 @@
-<img width="1626" height="933" alt="Screenshot from 2026-04-16 14-59-09" src="https://github.com/user-attachments/assets/6e1a288b-85ec-4843-80ae-104f148b082a" />
-<img width="641" height="1034" alt="Screenshot from 2026-04-16 14-53-12" src="https://github.com/user-attachments/assets/75b0471b-430d-4219-a04e-b3f9b430aec5" />
+<img width="1710" height="988" alt="20260802_22h26m45s_grim" src="https://github.com/user-attachments/assets/1db58832-c4ec-4d94-a790-40de4782d4f2" />
+<img width="888" height="1408" alt="20260802_22h32m55s_grim" src="https://github.com/user-attachments/assets/89ea3c85-180c-4086-a7f3-6a11d81c0dea" />
 
 # fmpc - Fast MPC Browser
 A minimalist, high-performance TUI browser for MPD using `fzf` and `ueberzugpp`.
