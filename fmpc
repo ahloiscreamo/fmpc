@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
 
-# UI colors
 G="\033[1;32m"
 Y="\033[1;33m"
 R="\033[1;31m"
@@ -10,7 +9,7 @@ W="\033[0;90m"
 WH="\033[1;37m"
 NC="\033[0m"
 
-# show usage guide if they ask for help
+# show help if asked
 if [[ "$1" == "--help" || "$1" == "-h" ]]; then
     echo -e "${M}fmpc${NC} - Fast MPC Browser (Sixel mode)"
     echo -e "--------------------------------"
@@ -22,32 +21,78 @@ if [[ "$1" == "--help" || "$1" == "-h" ]]; then
     echo -e "${M}Ctrl-n${NC}     : Next track"
     echo -e "${M}Ctrl-b${NC}     : Prev track"
     echo -e "${Y}Ctrl-u${NC}     : Update database"
+    echo -e "${Y}?${NC}          : Show shortcuts modal"
     echo -e "${W}ESC${NC}        : Clear search"
     echo -e "${R}Ctrl-q${NC}     : Quit"
     echo -e "--------------------------------"
     exit 0
 fi
 
-# grab user config overrides if they exist
+# keybindings popup modal
+if [[ "$1" == "--help-popup" ]]; then
+    HELP_TEXT=$(cat << EOF
+${G}  ENTER         ${NC} Play selected track
+${Y}  TAB           ${NC} Select / deselect multiple tracks
+${G}  Ctrl-x        ${NC} Play all selected tracks
+${C}  Ctrl-f        ${NC} Search currently playing track
+${M}  Ctrl-p        ${NC} Toggle play / pause
+${M}  Ctrl-n        ${NC} Next track
+${M}  Ctrl-b        ${NC} Previous track
+${Y}  Ctrl-u        ${NC} Update MPD database
+${Y}  ?             ${NC} Show this shortcut help modal
+${W}  ESC           ${NC} Clear search query
+${R}  Ctrl-q        ${NC} Quit fmpc
+EOF
+)
+    echo -e "$HELP_TEXT" | fzf \
+        --ansi \
+        --no-input \
+        --pointer="" \
+        --border=rounded \
+        --border-label="   fmpc Keybindings " \
+        --header="  Press any key to return..." \
+        --height="50%" \
+        --no-info \
+        --bind "enter:abort,esc:abort,space:abort,q:abort,change:abort" >/dev/null
+    exit 0
+fi
+
+# header info renderer
+if [[ "$1" == "--header-info" ]]; then
+    [[ -z "$2" ]] && exit 0
+    FILE="$2"
+    ALBUM_DIR=$(dirname "$FILE")
+    TRACK_NAME="${FILE##*/}"
+    CURRENT=$(mpc current -f "%file%")
+
+    if [[ "$FILE" == "$CURRENT" ]]; then
+        STATUS="${G}[ NOW PLAYING ]${NC}"
+    else
+        STATUS="${W}[ Selected ]${NC}"
+    fi
+
+    echo -e "${M}Album:${NC}  ${WH}${ALBUM_DIR}${NC}\n${C}Track:${NC}  ${WH}${TRACK_NAME}${NC}\n${M}Status:${NC} ${STATUS}\n${W}Press ${Y}? ${NC} ${W}for shortcuts${NC}"
+    exit 0
+fi
+
+# pull user config if present
 CONFIG_FILE="$HOME/.config/fmpc/config"
 [[ -f "$CONFIG_FILE" ]] && source "$CONFIG_FILE"
 
-# paths and default options
 export MUSIC_DIR="${MUSIC_DIR:-/mnt/Kingston/Music}"
 FIFO_PIPE="/tmp/fmpc_fifo"
 UB_PID_FILE="/tmp/fmpc_ub.pid"
 CACHE_DIR="$HOME/.cache/fmpc"
-export PREVIEW_POS="${PREVIEW_POS:-bottom}" # bottom/right
+export PREVIEW_POS="${PREVIEW_POS:-bottom}"
 PREVIEW_SIZE="${PREVIEW_SIZE:-50%}"
 
-# fallback dimensions for the album art (users config overrides these)
-BOTTOM_OFFSET_Y="${BOTTOM_OFFSET_Y:-1}"       # push image down from top
-BOTTOM_H_ADJUST="${BOTTOM_H_ADJUST:-3}"       # shrink image height so it fits
-BOTTOM_MANUAL_ADJUST="${BOTTOM_MANUAL_ADJUST:-2}" # nudge right to center the image
-RIGHT_OFFSET_Y="${RIGHT_OFFSET_Y:-6}"         # push image down (right layout)
-RIGHT_H_ADJUST="${RIGHT_H_ADJUST:-6}"         # shrink image height (right layout)
+BOTTOM_OFFSET_Y="${BOTTOM_OFFSET_Y:-1}"
+BOTTOM_H_ADJUST="${BOTTOM_H_ADJUST:-2}"
+BOTTOM_MANUAL_ADJUST="${BOTTOM_MANUAL_ADJUST:-2}"
+RIGHT_OFFSET_Y="${RIGHT_OFFSET_Y:-1}"
+RIGHT_H_ADJUST="${RIGHT_H_ADJUST:-2}"
 
-# this handles rendering inside fzf's preview panel
+# preview pane renderer
 if [[ "$1" == "--preview" ]]; then
     [[ -z "$2" ]] && exit
 
@@ -59,44 +104,11 @@ if [[ "$1" == "--preview" ]]; then
 
     mkdir -p "$CACHE_DIR"
 
-    # extract cover art if we haven't cached it yet
+    # grab cover art if missing
     if [[ ! -f "$ALBUM_COVER" ]]; then
         timeout 2s ffmpeg -i "$FULL_PATH" -an -vframes 1 -q:v 2 "$ALBUM_COVER" -y >/dev/null 2>&1
     fi
 
-    # center text only if the preview pane is at the bottom
-    center_text() {
-        local text="$1"
-        if [[ "$PREVIEW_POS" == "bottom" ]]; then
-            local clean_text=$(echo -e "$text" | sed 's/\x1b\[[0-9;]*[mGKHF]//g')
-            local width=${FZF_PREVIEW_COLUMNS:-80}
-            local dw=$(echo -n "$clean_text" | grep -oP '[\x{1100}-\x{11FF}\x{2E80}-\x{303F}\x{3040}-\x{9FFF}\x{AC00}-\x{D7AF}\x{F900}-\x{FAFF}\x{FE30}-\x{FE4F}\x{FF00}-\x{FFEF}]' | wc -l)
-            local n=$(( ${#clean_text} + dw ))
-            local pad=$(( (width - n) / 2 ))
-            [[ $pad -lt 0 ]] && pad=0
-            printf "%${pad}s" " "
-        fi
-        echo -e "$text"
-    }
-
-    # show current playback status and track info
-    SEP_LINE=$(printf '%.0s-' $(seq 1 ${FZF_PREVIEW_COLUMNS:-40}))
-    CURRENT=$(mpc current -f "%file%")
-
-    if [[ "$FILE" == "$CURRENT" ]]; then
-        center_text "${G}[ NOW PLAYING ]${NC}"
-    else
-        center_text "${W}[ Selected ]${NC}"
-    fi
-
-    [[ "$PREVIEW_POS" == "right" ]] && center_text "${W}${SEP_LINE}${NC}"
-
-    center_text "${M}Album:${NC} ${WH}$ALBUM_DIR${NC}"
-    center_text "${C}Track:${NC} ${WH}${FILE##*/}${NC}"
-
-    [[ "$PREVIEW_POS" == "right" ]] && center_text "${W}${SEP_LINE}${NC}"
-
-    # calculate image geometry and draw it
     if [[ -f "$ALBUM_COVER" && -p "$FIFO_PIPE" ]]; then
         if [[ "$PREVIEW_POS" == "bottom" ]]; then
             dims=$(ffprobe -v error -select_streams v:0 -show_entries stream=width,height -of csv=s=x:p=0 "$ALBUM_COVER")
@@ -124,7 +136,7 @@ if [[ "$1" == "--preview" ]]; then
     exit
 fi
 
-# kill background jobs and clean up temp files on exit
+# clean up on exit
 cleanup() {
     if [ -f "$FOLLOW_PID_FILE" ]; then
         follower_pid=$(cat "$FOLLOW_PID_FILE")
@@ -137,7 +149,7 @@ cleanup() {
 }
 trap cleanup EXIT
 
-# spin up the ueberzugpp daemon (defaults to sixel)
+# start ueberzugpp layer daemon
 rm -f "$FIFO_PIPE"
 mkfifo "$FIFO_PIPE"
 ueberzugpp layer --silent -o "${UB_OUTPUT:-sixel}" < <(tail -f "$FIFO_PIPE") &
@@ -148,10 +160,10 @@ FOLLOW_PID_FILE="/tmp/fmpc_follow.pid"
 FZF_SOCK_PATH="/tmp/fmpc.sock"
 FOLLOWER_SCRIPT="$HOME/.local/bin/fmpc-follower"
 
-# cache the whole mpd library so browsing is fast
+# cache mpd library
 mpc listall > "$LIST_CACHE"
 
-# figure out where the currently playing song is in the list
+# jump to currently playing track
 current_file=$(mpc current -f "%file%")
 initial_jump_index=1
 if [[ -n "$current_file" ]]; then
@@ -163,41 +175,34 @@ DIR_COL=$'\e[35m'
 FILE_COL=$'\e[37m'
 RESET=$'\e[0m'
 
-# customize the list style and instructions depending on layout
 if [[ "$PREVIEW_POS" == "bottom" ]]; then
     LIST_CMD="sed \"s|^.*/\(.*\)$|${FILE_COL}\1${RESET}\t&|\" $LIST_CACHE"
-    L1="ENTER ${G}${NC} Play ${W}|${NC} TAB ${Y}󰄳${NC} Sel   ${W}|${NC} C-x ${G}${NC} Play Sel"
-    L2="C-q   ${R}${NC} Quit ${W}|${NC} ESC ${M}${NC} Clear ${W}|${NC} C-f ${C}${NC} Find"
-    L3="C-n   ${M}󰒭${NC} Next ${W}|${NC} C-b ${Y}󰒮${NC} Prev  ${W}|${NC} C-p ${R}󰐎${NC} Toggle"
-    HEADER_TEXT=$(echo -e "$L1\n$L2\n$L3")
 else
     LIST_CMD="sed \"s|^\(.*\)/\(.*\)$|${DIR_COL}\1/${FILE_COL}\2${RESET}\t\1/\2|\" $LIST_CACHE"
-    RL1="ENTER ${G}${NC} Play ${W}|${NC} TAB ${Y}󰄳${NC} Sel ${W}|${NC} C-x ${G}${NC} Play Sel ${W}|${NC} C-q ${R}${NC} Quit ${W}|${NC} ESC ${M}${NC} Clear ${W}|${NC} C-f ${C}${NC} Find"
-    RL2="C-p ${R}󰐎${NC} Toggle ${W}|${NC} C-n ${M}󰒭${NC} Next ${W}|${NC} C-b ${Y}󰒮${NC} Prev"
-    HEADER_TEXT=$(echo -e "$RL1\n$RL2")   
 fi
 
-# fire it up
+# main interface
 eval "$LIST_CMD" | fzf \
     --ansi \
     --delimiter '\t' \
     --with-nth=1 \
     --multi \
     --listen="$FZF_SOCK_PATH" \
-    --header "$HEADER_TEXT" \
     --prompt " 󰎆 Music > " \
     --preview "$0 --preview {2}" \
     --preview-window="${PREVIEW_POS}:${PREVIEW_SIZE}:border-rounded" \
-    --bind "load:pos($initial_jump_index)" \
+    --bind "load:pos($initial_jump_index)+transform-header($0 --header-info {2})" \
+    --bind "focus:transform-header($0 --header-info {2})" \
     --bind "start:execute($FOLLOWER_SCRIPT '$LIST_CACHE' '$FZF_SOCK_PATH' & echo \$! > '$FOLLOW_PID_FILE')" \
-    --bind "enter:execute-silent($HOME/.local/bin/fmpc-play {2} >/dev/null 2>&1)+refresh-preview" \
+    --bind "enter:execute-silent($HOME/.local/bin/fmpc-play {2} >/dev/null 2>&1)+transform-header($0 --header-info {2})+refresh-preview" \
     --bind "ctrl-x:execute($HOME/.local/bin/fmpc-play {+2} >/dev/null 2>&1)+deselect-all" \
     --bind "esc:change-query()+top" \
     --bind "change:top" \
     --bind "ctrl-f:transform-query(mpc current -f '%file%' | sed 's|.*/||')" \
-    --bind "ctrl-p:execute-silent(mpc toggle >/dev/null 2>&1)+refresh-preview" \
-    --bind "ctrl-n:execute-silent(mpc next >/dev/null 2>&1)+refresh-preview" \
-    --bind "ctrl-b:execute-silent(mpc prev >/dev/null 2>&1)+refresh-preview" \
-    --bind "ctrl-u:execute-silent(mpc update >/dev/null 2>&1)+refresh-preview" \
+    --bind "ctrl-p:execute-silent(mpc toggle >/dev/null 2>&1)+transform-header($0 --header-info {2})+refresh-preview" \
+    --bind "ctrl-n:execute-silent(mpc next >/dev/null 2>&1)+transform-header($0 --header-info {2})+refresh-preview" \
+    --bind "ctrl-b:execute-silent(mpc prev >/dev/null 2>&1)+transform-header($0 --header-info {2})+refresh-preview" \
+    --bind "ctrl-u:execute-silent(mpc update >/dev/null 2>&1)+transform-header($0 --header-info {2})+refresh-preview" \
+    --bind "?:execute($0 --help-popup)+refresh-preview" \
     --bind "ctrl-q:abort" \
     --reverse --border
